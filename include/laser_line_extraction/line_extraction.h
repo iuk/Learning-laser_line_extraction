@@ -3,10 +3,10 @@
 
 #include <cmath>
 #include <vector>
-#include <boost/array.hpp>
+#include <array>
 #include <Eigen/Dense>
-#include "laser_line_extraction/utilities.h"
-#include "laser_line_extraction/line.h"
+#include "utilities.h"
+#include "line.h"
 
 namespace line_extraction
 {

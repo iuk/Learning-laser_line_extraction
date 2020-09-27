@@ -26,12 +26,20 @@ struct Params
 {
   double bearing_var;
   double range_var;
+  // 最小二乘的终止条件
   double least_sq_angle_thresh;
   double least_sq_radius_thresh;
+  
+  // 粗分割时，点到直线的最大距离
+  double min_split_dist;
+  // 粗分割时，相邻点的最大间距
   double max_line_gap;
+
+
   double min_line_length;
   double min_range;
-  double min_split_dist;
+
+  // 点与左右相邻点间距，大于此则为 outlier
   double outlier_dist;
   unsigned int min_line_points;
 };

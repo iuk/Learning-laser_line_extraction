@@ -1,4 +1,4 @@
-#include "laser_line_extraction/line_extraction.h"
+#include "line_extraction.h"
 #include <algorithm>
 #include <Eigen/Dense>
 #include <iostream>
@@ -37,10 +37,13 @@ void LineExtraction::extractLines(std::vector<Line>& lines)
   }
 
   // Split indices into lines and filter out short and sparse lines
+  // 粗分割出多个直线段，存到 lines_ 中
   split(filtered_indices_);
+  // 依据长度和点数过滤一遍直线段
   filterLines();
 
   // Fit each line using least squares and merge colinear lines
+  // 遍历直线段
   for (std::vector<Line>::iterator it = lines_.begin(); it != lines_.end(); ++it)
   {
     it->leastSqFit();
@@ -85,11 +88,13 @@ void LineExtraction::setRangeData(const std::vector<double>& ranges)
 ///////////////////////////////////////////////////////////////////////////////
 // Parameter setting
 ///////////////////////////////////////////////////////////////////////////////
+// 传感器测角方差，rad
 void LineExtraction::setBearingVariance(double value)
 {
   params_.bearing_var = value;
 }
 
+// 传感器测距方差，m
 void LineExtraction::setRangeVariance(double value)
 {
   params_.range_var = value;
@@ -223,12 +228,15 @@ void LineExtraction::filterOutlierPoints()
 
 ///////////////////////////////////////////////////////////////////////////////
 // Filtering and merging lines
+// 依据长度和点数过滤一遍直线段
 ///////////////////////////////////////////////////////////////////////////////
 void LineExtraction::filterLines()
 {
   std::vector<Line> output;
+  // 遍历粗分割的所有直线
   for (std::vector<Line>::const_iterator cit = lines_.begin(); cit != lines_.end(); ++cit)
   {
+    // 是否满足长度要求和点数要求
     if (cit->length() >= params_.min_line_length && cit->numPoints() >= params_.min_line_points)
     {
       output.push_back(*cit);
@@ -260,7 +268,7 @@ void LineExtraction::mergeLines()
       Eigen::Matrix2d P_m = (P_1.inverse() + P_2.inverse()).inverse();
       Eigen::Vector2d L_m = P_m * (P_1.inverse() * L_1 + P_2.inverse() * L_2);
       // Populate new line with these merged parameters
-      boost::array<double, 4> cov;
+      std::array<double, 4> cov;
       cov[0] = P_m(0,0);
       cov[1] = P_m(0,1);
       cov[2] = P_m(1,0);
@@ -291,6 +299,7 @@ void LineExtraction::mergeLines()
 
 ///////////////////////////////////////////////////////////////////////////////
 // Splitting points into lines
+// 粗分割出多个直线段，存到 lines_ 中
 ///////////////////////////////////////////////////////////////////////////////
 void LineExtraction::split(const std::vector<unsigned int>& indices)
 {
@@ -308,14 +317,17 @@ void LineExtraction::split(const std::vector<unsigned int>& indices)
   int i_max, i_gap;
 
   // Find the farthest point and largest gap
+  // 遍历所有点
   for (std::size_t i = 1; i < indices.size() - 1; ++i)
   {
+    // 获得点到直线距离
     dist = line.distToPoint(indices[i]);
     if (dist > dist_max)
     {
       dist_max = dist;
       i_max = i;
     }
+    // 获得两点之间空隙
     gap = distBetweenPoints(indices[i], indices[i+1]);
     if (gap > gap_max)
     {
@@ -325,12 +337,14 @@ void LineExtraction::split(const std::vector<unsigned int>& indices)
   }
 
   // Check for gaps at endpoints
+  // 头两个点的空隙
   double gap_start = distBetweenPoints(indices[0], indices[1]);
   if (gap_start > gap_max)
   {
     gap_max = gap_start;
     i_gap = 1;
   }
+  // 末尾两点空隙
   double gap_end = distBetweenPoints(indices.rbegin()[1], indices.rbegin()[0]);
   if (gap_end > gap_max)
   {
@@ -339,10 +353,12 @@ void LineExtraction::split(const std::vector<unsigned int>& indices)
   }
 
   // Check if line meets requirements or should be split
+  // 如果最大距离 最大缝隙 都可接收，这是一个好直线
   if (dist_max < params_.min_split_dist && gap_max < params_.max_line_gap)
   {
     lines_.push_back(line);
   }
+  // 否则，分割此直线，视情况决定从最大距离处或者最大空隙处分割
   else
   {
     int i_split = dist_max >= params_.min_split_dist ? i_max : i_gap;

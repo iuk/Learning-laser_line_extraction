@@ -1,4 +1,4 @@
-#include "laser_line_extraction/line.h"
+#include "line.h"
 
 namespace line_extraction
 {
@@ -15,8 +15,8 @@ Line::Line(const CachedData &c_data, const RangeData &r_data, const Params &para
 {
 }
 
-Line::Line(double angle, double radius, const boost::array<double, 4> &covariance,
-       const boost::array<double, 2> &start, const boost::array<double, 2> &end,
+Line::Line(double angle, double radius, const std::array<double, 4> &covariance,
+       const std::array<double, 2> &start, const std::array<double, 2> &end,
        const std::vector<unsigned int> &indices):
   angle_(angle),
   radius_(radius),
@@ -39,12 +39,12 @@ double Line::getAngle() const
   return angle_;
 }
 
-const boost::array<double, 4>& Line::getCovariance() const
+const std::array<double, 4>& Line::getCovariance() const
 {
   return covariance_;
 }
 
-const boost::array<double, 2>& Line::getEnd() const
+const std::array<double, 2>& Line::getEnd() const
 {
   return end_;
 }
@@ -59,7 +59,7 @@ double Line::getRadius() const
   return radius_;
 }
 
-const boost::array<double, 2>& Line::getStart() const
+const std::array<double, 2>& Line::getStart() const
 {
   return start_;
 }
@@ -100,20 +100,23 @@ void Line::projectEndpoints()
 
 ///////////////////////////////////////////////////////////////////////////////
 // Methods for endpoint line fitting
+// 端点直线拟合
 ///////////////////////////////////////////////////////////////////////////////
 void Line::endpointFit()
 {
   start_[0] = r_data_.xs[indices_[0]]; 
   start_[1] = r_data_.ys[indices_[0]]; 
   end_[0] = r_data_.xs[indices_.back()]; 
-  end_[1] = r_data_.ys[indices_.back()]; 
+  end_[1] = r_data_.ys[indices_.back()];
+  // 端点斜率
   angleFromEndpoints();
   radiusFromEndpoints();
 }
 
+// 端点斜率
 void Line::angleFromEndpoints()
 {
-  double slope;
+  double slope;//斜率
   if (fabs(end_[0] - start_[0]) > 1e-9)
   {
     slope = (end_[1] - start_[1]) / (end_[0] - start_[0]);
@@ -140,15 +143,19 @@ void Line::radiusFromEndpoints()
 ///////////////////////////////////////////////////////////////////////////////
 void Line::leastSqFit()
 {
+  // 基于 点的极坐标及协方差，计算所有点的直角坐标的协方差
   calcPointCovariances();
   double prev_radius = 0.0;
   double prev_angle = 0.0;
+  
+  // 如果不满足终止条件，则继续
   while (fabs(radius_ - prev_radius) > params_.least_sq_radius_thresh ||
          fabs(angle_ - prev_angle) > params_.least_sq_angle_thresh) 
   {
     prev_radius = radius_;
     prev_angle = angle_;
     calcPointScalarCovariances();
+    
     radiusFromLeastSq();
     angleFromLeastSq();
   }
@@ -214,17 +221,22 @@ void Line::calcCovariance()
   covariance_[3] = pow(1.0 / G, 2) * B;
 }
 
+// 基于 点的极坐标及协方差，计算其直角坐标的协方差
 void Line::calcPointCovariances()
 {
   point_covs_.clear();
   double r, phi, var_r, var_phi;
-  for (std::vector<unsigned int>::const_iterator cit = indices_.begin(); cit != indices_.end(); ++cit)
-  {
+  // 遍历直线段上所有点
+  for (std::vector<unsigned int>::const_iterator cit = indices_.begin();
+       cit != indices_.end(); ++cit) {
+    // 此点的 角度和距离
     r = r_data_.ranges[*cit]; // range
     phi = c_data_.bearings[*cit]; // bearing
+    // 预设的传感器角度和距离方差
     var_r = params_.range_var; // range variance
     var_phi = params_.bearing_var; // bearing variance
-    boost::array<double, 4> Q; 
+    
+    std::array<double, 4> Q; 
     Q[0] = pow(r, 2) * var_phi * pow(sin(phi), 2) + var_r * pow(cos(phi), 2);
     Q[1] = -pow(r, 2) * var_phi * sin(2 * phi) / 2.0 + var_r * sin(2 * phi) / 2.0;
     Q[2] = Q[1]; 
@@ -276,11 +288,11 @@ void Line::calcPointScalarCovariances()
   point_scalar_vars_.clear();
   double P;
   double inverse_P_sum = 0;
-  for (std::vector<boost::array<double, 4> >::const_iterator cit = point_covs_.begin();
-       cit != point_covs_.end(); ++cit)
-  {
-    P = (*cit)[0] * pow(cos(angle_), 2) + 2 * (*cit)[1] * sin(angle_) * cos(angle_) +
-        (*cit)[3] * pow(sin(angle_), 2);
+  for (std::vector<std::array<double, 4> >::const_iterator cit = point_covs_.begin();
+       cit != point_covs_.end(); ++cit) {
+    P = (*cit)[0] * pow(cos(angle_), 2)              //
+        + 2 * (*cit)[1] * sin(angle_) * cos(angle_)  //
+        + (*cit)[3] * pow(sin(angle_), 2);
     inverse_P_sum += 1.0 / P;
     point_scalar_vars_.push_back(P);
   }
@@ -291,6 +303,7 @@ void Line::radiusFromLeastSq()
 {
   radius_ = 0;
   double r, phi;
+  // 遍历所有点
   for (std::vector<unsigned int>::const_iterator cit = indices_.begin(); cit != indices_.end(); ++cit)
   {
     r = r_data_.ranges[*cit]; // range
